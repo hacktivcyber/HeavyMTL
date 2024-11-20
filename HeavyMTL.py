@@ -198,6 +198,32 @@ def process_Amcache_csv(file_path, output_file, host, user):
 
             writer.writerow([row[date_index], source_index, host_index, user_index, desc_string])
 
+def process_AppCompatCache_csv(file_path, output_file, host, user):
+    with open(file_path, 'r', encoding='utf-8-sig') as f, open(output_file, 'a', newline='',
+                                                               encoding='utf-8-sig') as output:
+        reader = csv.reader(f)
+        header = next(reader)
+
+        # Find column indices
+        date_index = header.index('LastModifiedTimeUTC')
+        source_index = 'AppCompatCache'
+        host_index = host
+        user_index = user
+
+        writer = csv.writer(output, delimiter='\t')
+
+        # Write header if the file is empty
+        if output.tell() == 0:
+            writer.writerow(['Date', 'Source', 'Host', 'User', 'Desc'])
+
+        for row in reader:
+            if bool(row[date_index]):
+                desc_fields = [f"{header[i]}: {row[i].replace('\t', '   ')}" for i in range(len(header)) if
+                               i not in (date_index, source_index, host_index, user_index)]
+                desc_string = '  '.join(desc_fields)
+                desc_string = '[M] ' + desc_string
+                writer.writerow([row[date_index], source_index, host_index, user_index, desc_string])
+
 def process_csv(file_path, output_file, host, user):
     if file_path.endswith("_EvtxECmd_Output.csv"):
         process_evtx_ecmd_output(file_path, output_file)
@@ -225,6 +251,8 @@ def process_csv(file_path, output_file, host, user):
         process_Amcache_csv(file_path, output_file, host, user)
     elif file_path.endswith("_Amcache_ShortCuts.csv"):
         process_Amcache_csv(file_path, output_file, host, user)
+    elif file_path.endswith("_AppCompatCache.csv"):
+        process_AppCompatCache_csv(file_path, output_file, host, user)
     else:
         print("Unsupported file type.")
 def main():
