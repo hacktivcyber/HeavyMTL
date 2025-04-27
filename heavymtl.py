@@ -93,6 +93,25 @@ CSV_MAPPINGS = {
         "system": lambda df: "Unknown_System",
         "user": lambda df: "Unknown_User"
     },
+    "*_SumECmd_DETAIL_ClientDetailed_Output.csv": {  # SUMdb ClientDetailed files
+        "time_fields": [
+            ("InsertDate", "I"),
+            ("LastAccess", "L")
+        ],  # Multiple timestamps with prefixes
+        "source": lambda df: "SUMdb",
+        "system": lambda df: df.get('IpAddress', "Unknown_System"),
+        "user": lambda df: df.get('AuthenticatedUserName', "Unknown_User")
+    },
+    "*_RecentFileCacheParser_Output.csv": {  # RecentFileCacheParser files
+        "time_fields": [
+            ("SourceCreated", "C"),
+            ("SourceModified", "M"),
+            ("SourceAccessed", "A")
+        ],  # Multiple timestamps with prefixes
+        "source": lambda df: "RecentFileCache",
+        "system": lambda df: "Unknown_Host",
+        "user": lambda df: "Unknown_User"
+    },
     "*_Amcache_*FileEntries.csv": {
         "time": "FileKeyLastWriteTimestamp",
         "source": lambda df: "AMCACHE",
@@ -293,8 +312,8 @@ def parse_csv_to_tln(csv_path, files_remaining):
         else:
             df["User"] = df.get(mapping["user"], "Unknown_User")
 
-        # Special handling for JumpList, LinkFile, and $MFT files with multiple timestamps
-        if csv_type in ["*_*Destinations.csv", "*_LECmd_Output.csv", "*_MFTECmd_\\$MFT_Output.csv"]:
+        # Special handling for JumpList, LinkFile, MFT, SUMdb, and RecentFileCache files with multiple timestamps
+        if csv_type in ["*_*Destinations.csv", "*_LECmd_Output.csv", "*_MFTECmd_\\$MFT_Output.csv", "*_SumECmd_DETAIL_ClientDetailed_Output.csv", "*_RecentFileCacheParser_Output.csv"]:
             time_fields = mapping.get("time_fields", [])
             # Extract field names and their corresponding prefix letters
             field_names = [field[0] if isinstance(field, tuple) else field for field in time_fields]
@@ -310,12 +329,17 @@ def parse_csv_to_tln(csv_path, files_remaining):
                 logging.error(f"Timestamp fields {missing} not found in {csv_path} ({files_remaining} files remaining)")
                 return None
 
-            # Generate description for JumpList/LinkFile/$MFT files (before timestamp processing)
+            # Generate description for JumpList/LinkFile/MFT/SUMdb/RecentFileCache files (before timestamp processing)
             exclude_cols = field_names.copy()
             if not callable(mapping.get("system")) and mapping.get("system"):
                 exclude_cols.append(mapping["system"])
-            if not callable(mapping.get("user")) and mapping["user"]:
+            if not callable(mapping.get("user")) and mapping.get("user"):
                 exclude_cols.append(mapping["user"])
+            # Exclude specific columns for SUMdb and SRUM to avoid duplication in description
+            if csv_type == "*_SumECmd_DETAIL_ClientDetailed_Output.csv":
+                exclude_cols.extend(["AuthenticatedUserName", "IpAddress"])
+            elif csv_type == "*_SrumECmd_*.csv":
+                exclude_cols.extend(["UserName", "Sid"])
             remaining_cols = [col for col in df.columns if col not in exclude_cols and col not in TLN_COLUMNS]
             df["BaseDescription"] = df[remaining_cols].apply(
                 lambda row: ", ".join(f"{k}: {v}" for k, v in row.dropna().items() if str(v).strip()), axis=1
@@ -367,7 +391,7 @@ def parse_csv_to_tln(csv_path, files_remaining):
 
             df["Time"] = pd.to_datetime(df[time_col], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
 
-            # Generate description for non-JumpList/LinkFile/$MFT files
+            # Generate description for non-JumpList/LinkFile/MFT/SUMdb/RecentFileCache files
             exclude_cols = []
             if "time" in mapping:
                 exclude_cols.append(mapping["time"])
@@ -375,7 +399,7 @@ def parse_csv_to_tln(csv_path, files_remaining):
                 exclude_cols.extend([field[0] if isinstance(field, tuple) else field for field in mapping["time_fields"]])
             if not callable(mapping.get("system")) and mapping.get("system"):
                 exclude_cols.append(mapping["system"])
-            if not callable(mapping.get("user")) and mapping["user"]:
+            if not callable(mapping.get("user")) and mapping.get("user"):
                 exclude_cols.append(mapping["user"])
             # Exclude Sid and UserName for SRUM files to avoid duplication in description
             if csv_type == "*_SrumECmd_*.csv":
@@ -404,7 +428,7 @@ def create_postgres_table(conn):
                 Time TIMESTAMP,
                 Source TEXT,
                 System TEXT,
-                User TEXT,
+                Username TEXT,
                 Description TEXT
             );
         """)
@@ -415,7 +439,7 @@ def insert_to_postgres(conn, df):
     with conn.cursor() as cur:
         for _, row in df.iterrows():
             cur.execute("""
-                INSERT INTO master_timeline (Time, Source, System, User, Description)
+                INSERT INTO master_timeline (Time, Source, System, Username, Description)
                 VALUES (%s, %s, %s, %s, %s);
             """, (row["Time"], row["Source"], row["System"], row["User"], row["Description"]))
         conn.commit()
@@ -439,7 +463,7 @@ def main():
     parser.add_argument("-t", "--type", choices=["csv", "postgres"], required=True,
                         help="Output type: 'csv' or 'postgres'")
     parser.add_argument("-o", "--output", required=True,
-                        help="Output folder for CSV file (ignored if type is postgres)")
+                        help="Output folder for CSV file (used for logging ignored if type is postgres)")
     parser.add_argument("-d", "--db-url",
                         help="PostgreSQL URL (e.g., postgresql://user:password@localhost:5432/dbname), required if type is postgres")
 
@@ -489,7 +513,9 @@ def main():
         try:
             db_config = parse_db_url(args.db_url)
             conn = psycopg2.connect(**db_config)
+            logging.info(f"Creating PostgreSQL table: master_timeline in {conn}")
             create_postgres_table(conn)
+            logging.info(f"Writing {total_output_lines} TLN Rows into master_timeline table ")
             insert_to_postgres(conn, master_df)
             logging.info(f"Data successfully inserted into PostgreSQL: {total_output_lines} total lines written")
             print("Data successfully inserted into PostgreSQL.")
@@ -498,6 +524,7 @@ def main():
             logging.error(f"PostgreSQL error: {e}")
             print(f"PostgreSQL error: {e}")
     else:
+        master_df = master_df.sort_values(by=["Time", "Source", "System", "User"])
         master_df.to_csv(output_csv, index=False)
         logging.info(f"Master timeline written to {output_csv}: {total_output_lines} total lines written")
         print(f"Master timeline written to {output_csv}")
