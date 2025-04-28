@@ -35,7 +35,7 @@ Overall it goes fairly quickly. Parsing the results of $MFT & $J can make it tak
 
 - $MFT
   - Created0x10 [C1]
-  - Created0x30 [C3}
+  - Created0x30 [C3]
   - LastModified0x10 [M1]
   - LastModified0x30 [M3]
   - LastRecordChange0x10 [R1]
