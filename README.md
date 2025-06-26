@@ -17,7 +17,7 @@ HeavyMTL is a way to create a sigle master timeline from the output of the EZToo
 - sumecmd.mkape
 - WxTCmd.mkape
 
-You will need to have some Python experience as it uses a fair amount python libraries. It is running under Python 3.12.
+You will need to have some Python experience as it uses a fair amount python libraries. It is running under Python 3.12. If you are missing psycopg2, use psycopg2-binary (pip install psycopg2-binary).
 
 ## The command line args for CSV and postgres
 ### CSV
