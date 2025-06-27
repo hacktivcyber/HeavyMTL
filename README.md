@@ -1,6 +1,6 @@
 # HeavyMTL (Hacktivcybers Master TimeLiner)
 
-HeavyMTL is a way to create a sigle master timeline from the output of the EZTools module in KAPE. It can process the following modules, which should be the complete amount called by EZTools.mkape (with the exception of sqlecmd.mkape):
+HeavyMTL is a way to create a single master timeline from the output of the EZTools module in KAPE. It can process the following modules, which should be the complete amount called by EZTools.mkape (with the exception of sqlecmd.mkape):
 
 - amcacheparser.mkape
 - appcompatcacheparser.mkape

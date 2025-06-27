@@ -421,25 +421,25 @@ def parse_csv_to_tln(csv_path, files_remaining):
         return None
 
 def create_postgres_table(conn):
-    """Create a TLN table in PostgreSQL."""
+    """Create a TLN table in PostgreSQL with quoted 'User' column."""
     with conn.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS master_timeline (
                 Time TIMESTAMP,
                 Source TEXT,
                 System TEXT,
-                Username TEXT,
+                "User" TEXT,
                 Description TEXT
             );
         """)
         conn.commit()
 
 def insert_to_postgres(conn, df):
-    """Insert TLN DataFrame into PostgreSQL."""
+    """Insert TLN DataFrame into PostgreSQL with quoted 'User' column."""
     with conn.cursor() as cur:
         for _, row in df.iterrows():
             cur.execute("""
-                INSERT INTO master_timeline (Time, Source, System, Username, Description)
+                INSERT INTO master_timeline (Time, Source, System, "User", Description)
                 VALUES (%s, %s, %s, %s, %s);
             """, (row["Time"], row["Source"], row["System"], row["User"], row["Description"]))
         conn.commit()
@@ -460,17 +460,18 @@ def main():
 
     parser = argparse.ArgumentParser(description="Parse EZTools KAPE CSVs into a TLN master timeline.")
     parser.add_argument("-i", "--input", required=True, help="Input folder containing KAPE EZTools CSVs")
-    parser.add_argument("-t", "--type", choices=["csv", "postgres"], required=True,
-                        help="Output type: 'csv' or 'postgres'")
+    parser.add_argument("-t", "--type", choices=["csv", "postgres", "both"], required=True,
+                        help="Output type: 'csv', 'postgres', or 'both' (CSV and PostgreSQL)")
     parser.add_argument("-o", "--output", required=True,
-                        help="Output folder for CSV file (used for logging ignored if type is postgres)")
+                        help="Output folder for CSV file")
     parser.add_argument("-d", "--db-url",
-                        help="PostgreSQL URL (e.g., postgresql://user:password@localhost:5432/dbname), required if type is postgres")
+                        help="PostgreSQL URL (e.g., postgresql://user:password@localhost:5432/dbname), required if type is 'postgres' or 'both'")
 
     args = parser.parse_args()
 
-    if args.type == "postgres" and not args.db_url:
-        parser.error("--db-url is required when --type is 'postgres'")
+    # Validate db-url requirement for postgres or both
+    if args.type in ["postgres", "both"] and not args.db_url:
+        parser.error("--db-url is required when --type is 'postgres' or 'both'")
 
     if not os.path.isdir(args.input):
         parser.error(f"Input folder '{args.input}' does not exist")
@@ -507,27 +508,57 @@ def main():
 
     master_df = pd.concat(master_timeline, ignore_index=True)
     master_df["Time"] = pd.to_datetime(master_df["Time"])
-    master_df = master_df.sort_values("Time").reset_index(drop=True)
+    master_df = master_df.sort_values(by=["Time", "Source", "System", "User"]).reset_index(drop=True)
 
-    if args.type == "postgres":
+    # Track success of each output method
+    csv_success = False
+    postgres_success = False
+    output_messages = []
+
+    # Handle CSV output
+    if args.type in ["csv", "both"]:
+        try:
+            master_df.to_csv(output_csv, index=False)
+            logging.info(f"Master timeline written to {output_csv}: {total_output_lines} total lines written")
+            output_messages.append(f"Master timeline written to {output_csv}")
+            csv_success = True
+        except Exception as e:
+            logging.error(f"Failed to write CSV to {output_csv}: {e}")
+            output_messages.append(f"Failed to write CSV: {e}")
+
+    # Handle PostgreSQL output
+    if args.type in ["postgres", "both"]:
         try:
             db_config = parse_db_url(args.db_url)
             conn = psycopg2.connect(**db_config)
-            logging.info(f"Creating PostgreSQL table: master_timeline in {conn}")
             create_postgres_table(conn)
-            logging.info(f"Writing {total_output_lines} TLN Rows into master_timeline table ")
             insert_to_postgres(conn, master_df)
             logging.info(f"Data successfully inserted into PostgreSQL: {total_output_lines} total lines written")
-            print("Data successfully inserted into PostgreSQL.")
+            output_messages.append("Data successfully inserted into PostgreSQL")
+            postgres_success = True
             conn.close()
         except Exception as e:
             logging.error(f"PostgreSQL error: {e}")
-            print(f"PostgreSQL error: {e}")
+            output_messages.append(f"PostgreSQL error: {e}")
+
+    # Print summary of output results
+    for message in output_messages:
+        print(message)
+
+    # Determine overall success
+    if args.type == "both":
+        if csv_success and postgres_success:
+            print("All outputs completed successfully.")
+        else:
+            print("One or more outputs failed. Check logs for details.")
+            sys.exit(1)
+    elif args.type == "csv" and csv_success:
+        print("CSV output completed successfully.")
+    elif args.type == "postgres" and postgres_success:
+        print("PostgreSQL output completed successfully.")
     else:
-        master_df = master_df.sort_values(by=["Time", "Source", "System", "User"])
-        master_df.to_csv(output_csv, index=False)
-        logging.info(f"Master timeline written to {output_csv}: {total_output_lines} total lines written")
-        print(f"Master timeline written to {output_csv}")
+        print("Output failed. Check logs for details.")
+        sys.exit(1)
 
     end_time = time.time()
     runtime = end_time - start_time
