@@ -19,12 +19,13 @@ HeavyMTL is a way to create a single master timeline from the output of the EZTo
 
 You will need to have some Python experience as it uses a fair amount python libraries. It is running under Python 3.12. If you are missing psycopg2, use psycopg2-binary (pip install psycopg2-binary).
 
-## The command line args for CSV and postgres
+## The command line args for CSV, PostgreSQL and Both
 ### CSV
 -i "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1\Modules" -t csv -o "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1"
 ### PostgreSQL
 -i "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1\Modules" -t postgres -d postgresql://postgres:postgres@localhost:5432/timeline -o "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1"
-
+### Both
+-i "\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1\Modules" -t both -d postgresql://postgres:postgres@localhost:5432/timeline -o "\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1"
 Overall it goes fairly quickly. Parsing the results of $MFT & $J can make it take a few minutes (about 7 in testing). Without those it usually finishes in under 30 seconds. **YMMV**.
 
 ## Duplicate event artifacts with the same datetimes are grouped into a single master_timeline entry and uniquely coded:
