@@ -21,7 +21,7 @@ You will need to have some Python experience as it uses a fair amount python lib
 
 ## The command line args for CSV and postgres
 ### CSV
--i "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1\Modules" -t "csv" -o "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1"
+-i "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1\Modules" -t csv -o "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1"
 ### PostgreSQL
 -i "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1\Modules" -t postgres -d postgresql://postgres:postgres@localhost:5432/timeline -o "\\diskstation\uploads\USC\ITP 375\Labs\KAPE\Case_1"
 
