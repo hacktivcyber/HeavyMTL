@@ -133,7 +133,7 @@ CSV_MAPPINGS = {
     "*_EvtxECmd_Output.csv": {
         "time": "TimeCreated",
         "source": lambda df: "EVTX",
-        "system": "ComputerName",
+        "system": "Computer",
         "user": "UserId"
     },
     "*_RunMRU__*_Users_*_NTUSER.DAT.csv": {
