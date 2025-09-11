@@ -207,7 +207,7 @@ def find_csv_files(root_dir):
                     logging.debug(f"No match for file {file}")
     return csv_files
 
-def parse_csv_to_tln(csv_path, files_remaining):
+def parse_csv_to_tln(csv_path, files_remaining, hostname):
     """Parse a single CSV into TLN format with one column per field and concatenated description."""
     logging.info(f"Processing file: {csv_path} ({files_remaining} files remaining)")
     try:
@@ -233,7 +233,7 @@ def parse_csv_to_tln(csv_path, files_remaining):
         if callable(mapping["system"]):
             df["System"] = mapping["system"](df)
         else:
-            df["System"] = df.get(mapping["system"], "Unknown_System")
+            df["System"] = df.get(mapping["system"], hostname)
 
         if mapping["user"] is None:
             if ("HivePath" in df.columns) and ("RECmd_Batch_UserActivity_Output.csv" in filename):  # For RECmd_Batch_UserActivity_Output.csv
@@ -466,6 +466,7 @@ def main():
                         help="Output folder for CSV file")
     parser.add_argument("-d", "--db-url",
                         help="PostgreSQL URL (e.g., postgresql://user:password@localhost:5432/dbname), required if type is 'postgres' or 'both'")
+    parser.add_argument("-s", "--system", required=True, help="Host name, System name, Evidence Number")
 
     args = parser.parse_args()
 
@@ -496,7 +497,7 @@ def main():
     total_output_lines = 0
     for i, csv_file in enumerate(csv_files, 1):
         files_remaining = total_files - i
-        tln_df = parse_csv_to_tln(csv_file, files_remaining)
+        tln_df = parse_csv_to_tln(csv_file, files_remaining, args.system)
         if tln_df is not None:
             master_timeline.append(tln_df)
             total_output_lines += len(tln_df)
