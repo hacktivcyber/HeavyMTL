@@ -2,7 +2,7 @@
 SELECT * FROM master_timeline
 WHERE ("time" > '2025-12-01' AND "time" < '2025-12-20') AND
 description ILIKE ANY (ARRAY[
-	/* Malwarae Scanning Events */
+	/* Malware Scanning Events */
     '%EventId: 1000,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Started
     '%EventId: 1001,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Completed
     '%EventId: 1002,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Canceled
