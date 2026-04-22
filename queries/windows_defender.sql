@@ -2,6 +2,14 @@
 SELECT * FROM master_timeline
 WHERE ("time" > '2025-12-01' AND "time" < '2025-12-20') AND
 description ILIKE ANY (ARRAY[
+	/* Malwarae Scanning Events */
+    '%EventId: 1000,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Started
+    '%EventId: 1001,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Completed
+    '%EventId: 1002,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Canceled
+    '%EventId: 1003,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Paused
+    '%EventId: 1004,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Resumed
+    '%EventId: 1005,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scan Failed
+	
     /* Malware Detection Events */
     '%EventId: 1006,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Malware found
     '%EventId: 1007,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Malware action taken
@@ -24,7 +32,7 @@ description ILIKE ANY (ARRAY[
     '%EventId: 5008,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Engine failed
     '%EventId: 5010,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Scanning disabled
     '%EventId: 5012,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Virus scanning disabled
-    '%EventId: 5013,%, Channel: Microsoft-Windows-Windows Defender/Operational,%',  -- Tamper protection block
+    '%EventId: 5013,%, Channel: Microsoft-Windows-Windows Defender/Operational,%', -- Tamper protection block
 	
 	/* Service Control Manager (System Log) */
 	'%EventId: 7036,%, Channel: System,%', -- Service status changed (Look for 'Microsoft Defender Antivirus Service')
