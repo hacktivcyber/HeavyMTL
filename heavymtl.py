@@ -470,24 +470,33 @@ def main():
 
     args = parser.parse_args()
 
+    setup_logging(args.output)
+
     # Validate db-url requirement for postgres or both
     if args.type in ["postgres", "both"] and not args.db_url:
         parser.error("--db-url is required when --type is 'postgres' or 'both'")
 
+    # Test connection before running file processing
+    if args.type in ["postgres", "both"]:
+        try:
+            db_config = parse_db_url(args.db_url)
+            conn_test = psycopg2.connect(**db_config)
+            conn_test.close()
+            logging.info("PostgreSQL connection verified.")
+        except Exception as e:
+            parser.error(f"Failed to connect to PostgreSQL database: {e}")
+            
     if not os.path.isdir(args.input):
         parser.error(f"Input folder '{args.input}' does not exist")
 
     if not os.path.isdir(args.output):
         os.makedirs(args.output)
 
-    setup_logging(args.output)
-
     output_csv = os.path.join(args.output, "master_timeline.csv")
 
     csv_files = find_csv_files(args.input)
     if not csv_files:
         logging.warning("No EZTools CSVs found!")
-        print("No EZTools CSVs found!")
         return
 
     total_files = len(csv_files)
@@ -504,7 +513,6 @@ def main():
 
     if not master_timeline:
         logging.warning("No data parsed successfully!")
-        print("No data parsed successfully!")
         return
 
     master_df = pd.concat(master_timeline, ignore_index=True)
@@ -514,18 +522,15 @@ def main():
     # Track success of each output method
     csv_success = False
     postgres_success = False
-    output_messages = []
 
     # Handle CSV output
     if args.type in ["csv", "both"]:
         try:
             master_df.to_csv(output_csv, index=False)
             logging.info(f"Master timeline written to {output_csv}: {total_output_lines} total lines written")
-            output_messages.append(f"Master timeline written to {output_csv}")
             csv_success = True
         except Exception as e:
             logging.error(f"Failed to write CSV to {output_csv}: {e}")
-            output_messages.append(f"Failed to write CSV: {e}")
 
     # Handle PostgreSQL output
     if args.type in ["postgres", "both"]:
@@ -535,30 +540,24 @@ def main():
             create_postgres_table(conn)
             insert_to_postgres(conn, master_df)
             logging.info(f"Data successfully inserted into PostgreSQL: {total_output_lines} total lines written")
-            output_messages.append("Data successfully inserted into PostgreSQL")
             postgres_success = True
             conn.close()
         except Exception as e:
             logging.error(f"PostgreSQL error: {e}")
-            output_messages.append(f"PostgreSQL error: {e}")
-
-    # Print summary of output results
-    for message in output_messages:
-        print(message)
 
     # Determine overall success
     if args.type == "both":
         if csv_success and postgres_success:
-            print("All outputs completed successfully.")
+            logging.info("All outputs completed successfully.")
         else:
-            print("One or more outputs failed. Check logs for details.")
+            logging.error("One or more outputs failed. Check logs for details.")
             sys.exit(1)
     elif args.type == "csv" and csv_success:
-        print("CSV output completed successfully.")
+        logging.info("CSV output completed successfully.")
     elif args.type == "postgres" and postgres_success:
-        print("PostgreSQL output completed successfully.")
+        logging.info("PostgreSQL output completed successfully.")
     else:
-        print("Output failed. Check logs for details.")
+        logging.error("Output failed. Check logs for details.")
         sys.exit(1)
 
     end_time = time.time()
