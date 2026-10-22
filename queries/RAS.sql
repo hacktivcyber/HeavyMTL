@@ -61,4 +61,5 @@ description ILIKE ANY (ARRAY[
 	'%TeamViewer_Service.exe%',
 	'%TeamViewer.exe%',
 	'%zerotier-one.exe%'
+])
 ORDER BY "time"
